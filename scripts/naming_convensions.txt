@@ -1,0 +1,50 @@
+Python jest case-sensitive, więc User, user i USER to trzy różne identyfikatory.
+Dlatego warto trzymać się jasno określonych zasad nazewnictwa z PEP 8 (Python Style Guide)*.
+
+1. Nazwy zmiennych i funkcji ==> małe litery, podkreślenia (snake_case)
+  user_name = "Dawid"
+  total_amount = calculate_total(price, tax)
+  def get_weather_data(city_name)
+
+2. Nazwy klas ==>  Wielki litery na początków wyrazów (CamelCase)
+  class WeatherApp:
+    ...
+  class UserProfile:
+    ...
+
+3. Nazwy modułów i plików ==> małe litery, podkreślenia (snake_case.py)
+    weather_api.py
+    main_view.py
+    data_manager.py
+
+4. Nazwy pakietów (folderów) ==> małe litery, bez podkreśleń (lowercase)
+    app/
+    controlelrs/
+    models/
+
+5. Stałe ==> Duże litery z podkreśleniami (UPPER_CASE)
+    MAX_RETRIES = 3
+    API_KEY = "123456"
+    DEFAULT_TIMEOUT = 10
+
+6. Atrybuty prywatne ==> podkreślenia na początku (_nazwa)
+    class User:
+      def __init__(self):
+        self._password = None        #konwencja: wewnętrzne użycie ("_nazwa" - sugeruje, żeby nie używać tego poza klasa)
+        self.__token = "hidden"       #mechanizm: name mangling ("__nazwa: - Python zmienia nazwę wewnętrznie)
+
+7. Słowa kluczowe (instrukcje języka) ==> zawsze małe litery
+    and, as, assert, break, class, continue, def, del, elif, else, except,
+    finally, for, from, global, if, import, in, is, lambda,
+    nonlocal, not, or, pass, raise, return, try, while, with, yield
+
+
+8. Specjalne stałe (obiekty systemowe) ==> Duża litera
+    True, False, None
+
+
+
+*PEP8 to skrót od Python Enhancement Proposal number 8 (Propozycja Ulepszeń Pythona numer 8). Oznacza on oficjalny, obszerny przewodnik po stylu (ang. style guide) pisania kodu w języku Python.
+Głównym celem PEP 8 jest zapewnienie spójnego, profesjonalnego i łatwego do czytania kodu Pythona, co ułatwia współpracę między programistami oraz utrzymanie projektów.
+
+
