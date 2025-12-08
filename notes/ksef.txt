@@ -1,59 +1,51 @@
 Dzień dobry,
 
-testuję integrację z KSeF 2.0 na środowisku DEMO jako integrator wewnętrzny (automatyzacja wysyłki i odbioru faktur dla podmiotu o NIP 1070002909) i potrzebuję doprecyzowania zasad uwierzytelniania oraz uprawnień, ponieważ napotkałem blokadę, której nie potrafię usunąć wyłącznie po swojej stronie technicznej.
+testuję integrację z KSeF 2.0 na środowisku DEMO jako integrator wewnętrzny (automatyzacja wysyłki i odbioru faktur dla podmiotu NIP 1070002909) i mam problem z uwierzytelnianiem oraz uprawnieniami.
 
-Środowisko TEST (TE – KSeF 1.0 / 2.0)
-Na środowisku testowym korzystam z certyfikatu, w którym w polu identyfikatora jest wpisany NIP firmy. Uwierzytelnienie oraz komunikacja przez API w Pythonie działają poprawnie: mogę otworzyć sesję, wysyłać faktury, pobierać je, odbierać UPO i numer KSeF. Oznacza to, że sama logika integracji (kolejność wywołań, formaty, szyfrowanie) jest poprawna.
+TEST
+Na środowisku testowym używam certyfikatu z NIP firmy. Uwierzytelnienie z Pythona działa poprawnie: otwieram sesję, wysyłam i pobieram faktury, odbieram UPO i numer KSeF – więc sama logika integracji jest prawidłowa.
 
-Środowisko DEMO / przedprodukcyjne
-Na środowisku DEMO mam:
+DEMO
+Na DEMO:
 
-aktywne uprawnienia „wystawianie faktur”, „przeglądanie faktur”, „przeglądanie historii sesji”, „zarządzanie jednostkami podrzędnymi”, „przeglądanie uprawnień” przypisane do mojego PESEL,
+mam aktywne uprawnienia: wystawianie faktur, przeglądanie faktur, przeglądanie historii sesji, zarządzanie jednostkami podrzędnymi, przeglądanie uprawnień (przypisane do mojego PESEL),
 
-możliwość zalogowania się do Aplikacji Podatnika KSeF 2.0 (web2tr-ksef.mf.gov.pl) przez Profil Zaufany,
+loguję się do Aplikacji Podatnika (web2tr-ksef.mf.gov.pl) przez Profil Zaufany,
 
-możliwość wygenerowania tokenu systemowego z pełnym zakresem (wystawianie, przeglądanie faktur itd.).
+generuję token systemowy z pełnym zakresem (wszystkie dostępne checkboxy).
 
 Technicznie:
 
-wywołanie /api/v2/auth/challenge → 200,
+POST /api/v2/auth/challenge → 200,
 
-wywołanie /api/v2/auth/ksef-token z wygenerowanym tokenem → 202 (czyli token jest akceptowany),
-ale każde kolejne wywołanie sesji lub faktur zwraca 403 Forbidden bez treści, m.in.:
+POST /api/v2/auth/ksef-token → 202 (token przyjęty),
+ale kolejne wywołania kończą się 403 (puste body), m.in.:
 
-/api/v2/sessions/online (skrypt t‑10‑session‑online.py),
+POST /api/v2/sessions/online (t‑10‑session‑online.py),
 
-/api/v2/sessions (t‑10‑session‑01‑list.py),
+GET /api/v2/sessions (t‑10‑session‑01‑list.py),
 
-/api/v2/invoices / skrypt t‑20‑add‑fv.py,
+wywołania faktur (t‑20‑add‑fv.py),
 
-/api/v2/tokens (t‑04‑token‑02‑list.py).
-
-To sugeruje, że:
-
-albo token systemowy z DEMO nie niesie uprawnień wystarczających do korzystania z API sesji/faktur,
-
-albo w środowisku DEMO 2.0 istnieje dodatkowy, niewidoczny w GUI zakres uprawnień / typ tokenu wymagany dla tych endpointów.
+GET /api/v2/tokens (t‑04‑token‑02‑list.py).
 
 Certyfikaty
-Na DEMO posiadam certyfikat kwalifikowany wystawiony na osobę (CN = imię i nazwisko, SERIALNUMBER = PNOPL‑PESEL). Jego użycie w XAdES kończy się błędem 21115 „Nieprawidłowy certyfikat”. Rozumiem, że do docelowej automatyzacji powinienem używać certyfikatu KSeF (typ 1 – uwierzytelnianie) z MCU, najlepiej wystawionego na NIP podmiotu. Na PROD taki certyfikat został już wygenerowany, ale również jako „certyfikat osobisty” (na PESEL pracownika), więc obawiam się powtórki problemu z DEMO.
+Na DEMO mam kwalifikowany certyfikat na osobę (CN = imię i nazwisko, SERIALNUMBER = PNOPL‑PESEL). Użycie go w XAdES kończy się błędem 21115 „Nieprawidłowy certyfikat”. Rozumiem, że docelowo trzeba używać certyfikatów KSeF z MCU (typ 1 – uwierzytelnianie), najlepiej na NIP podmiotu, ale obecnie w DEMO nie mam takiego certyfikatu ani jasnej informacji, jak go poprawnie powiązać z uprawnieniami.
 
-Prośba o doprecyzowanie
+Bardzo proszę o odpowiedź na trzy pytania:
 
-Bardzo proszę o jednoznaczną informację:
+Jakie dokładne uprawnienia i/lub typ tokenu systemowego są wymagane na DEMO, aby przez API móc:
 
-a) Jakie dokładne uprawnienia i/lub typ tokenu systemowego są wymagane na środowisku DEMO KSeF 2.0, aby:
+otworzyć sesję online,
 
-otwierać sesje online przez API,
+wysyłać i pobierać faktury,
 
-wysyłać faktury, pobierać je i odbierać UPO,
+korzystać z /api/v2/tokens?
 
-korzystać z endpointu /api/v2/tokens?
+Czy na DEMO da się to zrobić wyłącznie z użyciem tokenu z Aplikacji Podatnika, czy konieczny jest certyfikat KSeF z MCU (i jeśli tak, to jaki: na NIP podmiotu czy na PESEL osoby oraz jak go związać z uprawnieniami)?
 
-b) Czy na środowisku DEMO można w pełni korzystać z tych endpointów na podstawie tokenu wygenerowanego z Aplikacji Podatnika, czy konieczne jest już teraz użycie certyfikatu KSeF (z MCU) – a jeśli tak, to jakiego typu (na NIP podmiotu vs na PESEL osoby) i jak poprawnie go powiązać z uprawnieniami?
+Czy powtarzające się 403 bez treści na powyższych endpointach przy poprawnym 202 z /auth/ksef-token to zamierzone ograniczenie DEMO, czy błąd/niepełna konfiguracja po stronie środowiska?
 
-c) Czy zwracanie 403 bez body na ww. endpointach przy poprawnym 202 z /auth/ksef-token jest w DEMO zachowaniem zamierzonym (ograniczenie środowiska), czy błędem konfiguracyjnym, który można po stronie MF skorygować?
+Chciałbym ukończyć integrację na DEMO tak, aby po uruchomieniu PROD wystarczyło przełączyć adresy i podpiąć właściwy certyfikat/token, bez zmian logiki aplikacji.
 
-Chciałbym dokończyć integrację jeszcze na DEMO, tak aby od 1 lutego po uruchomieniu PROD wystarczyło przełączyć adresy i podmienić certyfikat/token bez zmian logiki aplikacji. Proszę o wskazanie konkretnych kroków (rodzaj certyfikatu/tokenu, wymagane uprawnienia), które powinienem uzgodnić z administratorem po stronie firmy, aby móc legalnie i poprawnie korzystać z API KSeF 2.0.
-
-Z góry dziękuję za pomoc i doprecyzowanie zasad.
+Z góry dziękuję za pomoc.
