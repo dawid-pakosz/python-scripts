@@ -1,25 +1,215 @@
-
-' m0constants
+' cConfig
 Option Explicit
 
-' --- Konfiguracja arkusza ---
-Public Const KSEF_CONFIG_SHEET_NAME As String = "KSeF_Konfiguracja"
-Public Const CONFIG_KEY_COL As Long = 1   ' Kolumna A
-Public Const CONFIG_VALUE_COL As Long = 2 ' Kolumna B
-Public Const CONFIG_DESC_COL As Long = 3  ' Kolumna C
+Private pKSeFNIP As String
+Private pKSeFToken As String
+Private pKSeFEnvironment As String
+Private pKSeFBaseUrl As String
+Private pLogFolderPath As String
+Private pKSeFCertPath As String
+Private pKSeFKeyPass As String
 
-' --- Klucze konfiguracyjne w arkuszu ---
-Public Const CONFIG_KEY_NIP As String = "KSEF_NIP"
-Public Const CONFIG_KEY_TOKEN As String = "KSEF_TOKEN"
-Public Const CONFIG_KEY_ENVIRONMENT As String = "KSEF_ENV"
-Public Const CONFIG_KEY_CERT_PATH As String = "KSEF_CERT_PATH"
-Public Const CONFIG_KEY_PRIVATE_KEY_PASS As String = "KSEF_KEY_PASS"
+' --- Właściwości (Properties) ---
+Public Property Get KSeFNIP() As String
+    KSeFNIP = pKSeFNIP
+End Property
+Public Property Let KSeFNIP(ByVal value As String)
+    pKSeFNIP = value
+End Property
 
-' --- Środowiska KSeF ---
-Public Const DEFAULT_KSEF_ENV As String = "TEST" ' Domyślne środowisko
-Public Const KSEF_API_BASE_URL_DEMO As String = "https://ksef-demo.mf.gov.pl/api/"
-Public Const KSEF_API_BASE_URL_TEST As String = "https://ksef-test.mf.gov.pl/api/"
-Public Const KSEF_API_BASE_URL_PROD As String = "https://ksef.mf.gov.pl/api/"
+Public Property Get KSeFToken() As String
+    KSeFToken = pKSeFToken
+End Property
+Public Property Let KSeFToken(ByVal value As String)
+    pKSeFToken = value
+End Property
 
-' --- Ścieżki domyślne (np. dla logów) ---
-Public Const KSEF_LOG_FOLDER_NAME As String = "KSeF_Logs\" ' Subfolder w miejscu pliku Excela
+Public Property Get KSeFEnvironment() As String
+    KSeFEnvironment = pKSeFEnvironment
+End Property
+Public Property Let KSeFEnvironment(ByVal value As String)
+    pKSeFEnvironment = UCase(value) ' Upewnij się, że środowisko jest wielkimi literami
+    Select Case pKSeFEnvironment
+        Case "DEMO": pKSeFBaseUrl = KSEF_API_BASE_URL_DEMO
+        Case "TEST": pKSeFBaseUrl = KSEF_API_BASE_URL_TEST
+        Case "PROD": pKSeFBaseUrl = KSEF_API_BASE_URL_PROD
+        Case Else: pKSeFBaseUrl = KSEF_API_BASE_URL_TEST ' Domyślnie TEST w przypadku błędu
+    End Select
+End Property
+
+Public Property Get KSeFBaseUrl() As String
+    KSeFBaseUrl = pKSeFBaseUrl
+End Property
+
+Public Property Get LogFolderPath() As String
+    LogFolderPath = pLogFolderPath
+End Property
+Public Property Let LogFolderPath(ByVal value As String)
+    pLogFolderPath = value
+End Property
+
+Public Property Get KSeFCertPath() As String
+    KSeFCertPath = pKSeFCertPath
+End Property
+Public Property Let KSeFCertPath(ByVal value As String)
+    pKSeFCertPath = value
+End Property
+
+Public Property Get KSeFKeyPass() As String
+    KSeFKeyPass = pKSeFKeyPass
+End Property
+Public Property Let KSeFKeyPass(ByVal value As String)
+    pKSeFKeyPass = value
+End Property
+
+' --- Metody ---
+Public Sub LoadConfig()
+    Dim ws As Worksheet
+    Dim lastRow As Long
+    Dim i As Long
+    Dim key As String
+    Dim value As String
+    
+    On Error GoTo ErrorHandler
+    
+    Set ws = ThisWorkbook.Sheets(KSEF_CONFIG_SHEET_NAME)
+    
+    With ws
+        lastRow = .Cells(.Rows.Count, CONFIG_KEY_COL).End(xlUp).Row
+        For i = 2 To lastRow ' Zakładamy nagłówki w wierszu 1
+            key = Trim(.Cells(i, CONFIG_KEY_COL).value)
+            value = Trim(.Cells(i, CONFIG_VALUE_COL).value)
+            
+            Select Case key
+                Case CONFIG_KEY_NIP:
+                    pKSeFNIP = value
+                Case CONFIG_KEY_TOKEN:
+                    pKSeFToken = value
+                Case CONFIG_KEY_ENVIRONMENT:
+                    Me.KSeFEnvironment = value ' Użyj Property Let do ustawienia URL
+                Case CONFIG_KEY_CERT_PATH:
+                    pKSeFCertPath = value
+                Case CONFIG_KEY_PRIVATE_KEY_PASS:
+                    pKSeFKeyPass = value
+            End Select
+        Next i
+    End With
+    
+    ' Ustaw wartości domyślne, jeśli nie znaleziono w arkuszu
+    If pKSeFNIP = "" Then pKSeFNIP = "BRAK_NIPU"
+    If pKSeFToken = "" Then pKSeFToken = "BRAK_TOKENU"
+    If pKSeFEnvironment = "" Then Me.KSeFEnvironment = DEFAULT_KSEF_ENV
+    
+    ' Domyślna ścieżka logów (w podfolderze obok pliku Excela)
+    If pLogFolderPath = "" Then
+        pLogFolderPath = ThisWorkbook.Path & IIf(Right(ThisWorkbook.Path, 1) = "\", "", "\") & KSEF_LOG_FOLDER_NAME
+    End If
+    
+    ' Upewnij się, że folder logów istnieje
+    Call EnsureDirectory(pLogFolderPath)
+    
+    m0creators.GetLog.LogInfo "Konfiguracja załadowana z arkusza '" & KSEF_CONFIG_SHEET_NAME & "'."
+    m0creators.GetLog.LogInfo "  NIP: " & pKSeFNIP
+    m0creators.GetLog.LogInfo "  Token: " & Left(pKSeFToken, 5) & IIf(Len(pKSeFToken) > 5, "...", "") ' Maskowanie tokena
+    m0creators.GetLog.LogInfo "  Środowisko: " & pKSeFEnvironment & " (URL: " & pKSeFBaseUrl & ")"
+    m0creators.GetLog.LogInfo "  Ścieżka logów: " & pLogFolderPath
+    m0creators.GetLog.LogInfo "  Ścieżka certyfikatu: " & pKSeFCertPath
+    m0creators.GetLog.LogInfo "  Hasło certyfikatu: " & IIf(pKSeFKeyPass <> "", "********", "Brak")
+    
+    Exit Sub
+ErrorHandler:
+    m0creators.GetLog.LogError "Błąd podczas ładowania konfiguracji z arkusza '" & KSEF_CONFIG_SHEET_NAME & "': " & Err.Description, Err
+    ' Ustaw wartości domyślne, nawet jeśli wystąpi błąd
+    pKSeFNIP = ""
+    pKSeFToken = ""
+    Me.KSeFEnvironment = DEFAULT_KSEF_ENV
+    pLogFolderPath = ThisWorkbook.Path & IIf(Right(ThisWorkbook.Path, 1) = "\", "", "\") & KSEF_LOG_FOLDER_NAME
+    Call EnsureDirectory(pLogFolderPath)
+End Sub
+
+Public Sub SaveConfig()
+    Dim ws As Worksheet
+    Dim lastRow As Long
+    Dim foundNip As Boolean, foundToken As Boolean, foundEnv As Boolean, foundCertPath As Boolean, foundKeyPass As Boolean
+    Dim i As Long
+    
+    On Error GoTo ErrorHandler
+    
+    Set ws = ThisWorkbook.Sheets(KSEF_CONFIG_SHEET_NAME)
+    
+    Application.ScreenUpdating = False ' Wyłącz odświeżanie ekranu dla płynności
+    
+    With ws
+        lastRow = .Cells(.Rows.Count, CONFIG_KEY_COL).End(xlUp).Row
+        For i = 2 To lastRow
+            Select Case Trim(.Cells(i, CONFIG_KEY_COL).value)
+                Case CONFIG_KEY_NIP:
+                    .Cells(i, CONFIG_VALUE_COL).value = pKSeFNIP
+                    foundNip = True
+                Case CONFIG_KEY_TOKEN:
+                    .Cells(i, CONFIG_VALUE_COL).value = pKSeFToken
+                    foundToken = True
+                Case CONFIG_KEY_ENVIRONMENT:
+                    .Cells(i, CONFIG_VALUE_COL).value = pKSeFEnvironment
+                    foundEnv = True
+                Case CONFIG_KEY_CERT_PATH:
+                    .Cells(i, CONFIG_VALUE_COL).value = pKSeFCertPath
+                    foundCertPath = True
+                Case CONFIG_KEY_PRIVATE_KEY_PASS:
+                    .Cells(i, CONFIG_VALUE_COL).value = pKSeFKeyPass
+                    foundKeyPass = True
+            End Select
+        Next i
+        
+        ' Dodaj klucze, jeśli nie znaleziono istniejących
+        If Not foundNip Then lastRow = lastRow + 1: .Cells(lastRow, CONFIG_KEY_COL).value = CONFIG_KEY_NIP: .Cells(lastRow, CONFIG_VALUE_COL).value = pKSeFNIP: .Cells(lastRow, CONFIG_DESC_COL).value = "Główny NIP firmy"
+        If Not foundToken Then lastRow = lastRow + 1: .Cells(lastRow, CONFIG_KEY_COL).value = CONFIG_KEY_TOKEN: .Cells(lastRow, CONFIG_VALUE_COL).value = pKSeFToken: .Cells(lastRow, CONFIG_DESC_COL).value = "Token autoryzacyjny KSeF"
+        If Not foundEnv Then lastRow = lastRow + 1: .Cells(lastRow, CONFIG_KEY_COL).value = CONFIG_KEY_ENVIRONMENT: .Cells(lastRow, CONFIG_VALUE_COL).value = pKSeFEnvironment: .Cells(lastRow, CONFIG_DESC_COL).value = "Środowisko KSeF (DEMO/TEST/PROD)"
+        If Not foundCertPath Then lastRow = lastRow + 1: .Cells(lastRow, CONFIG_KEY_COL).value = CONFIG_KEY_CERT_PATH: .Cells(lastRow, CONFIG_VALUE_COL).value = pKSeFCertPath: .Cells(lastRow, CONFIG_DESC_COL).value = "Ścieżka do pliku certyfikatu (.pfx)"
+        If Not foundKeyPass Then lastRow = lastRow + 1: .Cells(lastRow, CONFIG_KEY_COL).value = CONFIG_KEY_PRIVATE_KEY_PASS: .Cells(lastRow, CONFIG_VALUE_COL).value = pKSeFKeyPass: .Cells(lastRow, CONFIG_DESC_COL).value = "Hasło do pliku certyfikatu"
+    End With
+    
+    Application.ScreenUpdating = True ' Włącz odświeżanie ekranu
+    m0creators.GetLog.LogInfo "Konfiguracja zapisana do arkusza '" & KSEF_CONFIG_SHEET_NAME & "'."
+    Exit Sub
+ErrorHandler:
+    Application.ScreenUpdating = True
+    m0creators.GetLog.LogError "Błąd podczas zapisywania konfiguracji do arkusza '" & KSEF_CONFIG_SHEET_NAME & "': " & Err.Description, Err
+End Sub
+
+' Metoda pomocnicza: Upewnia się, że arkusz konfiguracyjny istnieje i ma nagłówki
+Public Sub EnsureConfigSheet()
+    On Error Resume Next
+    Dim ws As Worksheet
+    Set ws = ThisWorkbook.Sheets(KSEF_CONFIG_SHEET_NAME)
+    On Error GoTo 0
+    
+    If ws Is Nothing Then
+        Set ws = ThisWorkbook.Sheets.Add(After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.Count))
+        ws.Name = KSEF_CONFIG_SHEET_NAME
+        
+        ' Dodaj nagłówki
+        ws.Cells(1, CONFIG_KEY_COL).value = "Key"
+        ws.Cells(1, CONFIG_VALUE_COL).value = "Value"
+        ws.Cells(1, CONFIG_DESC_COL).value = "Description"
+        
+        ws.Columns(CONFIG_KEY_COL & ":" & CONFIG_DESC_COL).AutoFit
+        
+        m0creators.GetLog.LogInfo "Utworzono arkusz konfiguracji: " & KSEF_CONFIG_SHEET_NAME
+    End If
+End Sub
+
+' Metoda pomocnicza: Upewnia się, że folder istnieje
+Private Sub EnsureDirectory(ByVal path As String)
+    Dim fso As Object
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    If Not fso.FolderExists(path) Then
+        On Error GoTo ErrorHandler
+        fso.CreateFolder path
+        Debug.Print "Utworzono folder: " & path
+    End If
+    Set fso = Nothing
+    Exit Sub
+ErrorHandler:
+    Debug.Print "Błąd podczas tworzenia folderu " & path & ": " & Err.Description
+End Sub
